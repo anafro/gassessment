@@ -94,6 +94,8 @@ try {
 }
 Push-Location frontend
 try {
+    & npm test
+    Assert-NativeSuccess
     & npm run build
     Assert-NativeSuccess
 } finally { Pop-Location }

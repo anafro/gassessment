@@ -1,11 +1,14 @@
 <script setup lang="ts">
     import { computed, onMounted, onUnmounted, ref } from 'vue';
+    import {
+        recoverPending,
+        pendingStorageKey,
+        type BetRequest,
+    } from './recovery';
     /** Server line snapshot; odds are integer hundredths in P1/draw/P2 order. */
     type Match = { id: number; name: string; odds: number[] };
     /** Frozen price chosen by the player, independent of subsequent live updates. */
     type Selection = { match: number; outcome: number; odds: number };
-    /** Payload preserved unchanged until the server gives a definitive result. */
-    type BetRequest = Selection & { key: string; amount: string };
     const matches = ref<Match[]>([]);
     const balance = ref<number>();
     const connected = ref(false);
@@ -13,21 +16,20 @@
     const amount = ref('100.00');
     const busy = ref(false);
     const selected = ref<Selection>();
-    const pending = ref<BetRequest>();
-    const storageBlocked = ref(false);
-    const pendingStorageKey = 'sportsbook.pending.v1';
-    // Recovery is best effort; saved JSON currently has no runtime schema check.
-    try {
-        const saved = localStorage.getItem(pendingStorageKey);
-        if (saved) {
-            pending.value = JSON.parse(saved);
-            selected.value = pending.value;
-            message.value =
-                'Есть незавершённый запрос. Повторите его для проверки.';
-        }
-    } catch {
+    // Access localStorage inside the callback so even a denied getter is caught.
+    const recovery = recoverPending(
+        () => localStorage.getItem(pendingStorageKey),
+        () => localStorage.removeItem(pendingStorageKey),
+    );
+    const pending = ref<BetRequest | undefined>(recovery.pending);
+    const storageBlocked = ref(recovery.blocked);
+    if (recovery.blocked) {
         message.value =
-            'Хранилище недоступно. Отправка новых ставок заблокирована.';
+            'Не удалось восстановить запрос. Новые ставки заблокированы: проверьте хранилище браузера.';
+    } else if (recovery.pending) {
+        selected.value = recovery.pending;
+        message.value =
+            'Есть незавершённый запрос. Повторите его для проверки.';
     }
     /** Remove durable state first; a storage failure keeps the retry in memory. */
     function clearPending() {
@@ -172,7 +174,9 @@
                         :key="i"
                         type="button"
                         class="flex-1 cursor-pointer rounded-md border border-slate-300 p-3 disabled:cursor-default disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                        :disabled="!connected || busy || !!pending"
+                        :disabled="
+                            storageBlocked || !connected || busy || !!pending
+                        "
                         :class="
                             selected?.match === m.id && selected?.outcome === i
                                 ? 'bg-[#215bd7] text-white'
@@ -202,11 +206,12 @@
                     v-model="amount"
                     inputmode="decimal"
                     class="mx-3 w-30 rounded-md border border-slate-300 p-3"
-                    :disabled="busy || !!pending" /></label
+                    :disabled="storageBlocked || busy || !!pending" /></label
             ><button
                 type="button"
                 class="cursor-pointer rounded-md border border-slate-300 bg-[#215bd7] p-3 text-white disabled:cursor-default disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                 :disabled="
+                    storageBlocked ||
                     busy ||
                     (!pending &&
                         (!selected || !connected || balance === undefined))

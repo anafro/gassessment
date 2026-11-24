@@ -1,6 +1,7 @@
 {
     "scripts": {
-        "build": "vue-tsc --noEmit && vite build"
+        "build": "vue-tsc --noEmit && vite build",
+        "test": "node --test recovery.test.mjs"
     },
     "dependencies": {
         "vue": "3.5.13"
