@@ -1,7 +1,10 @@
 <script setup lang="ts">
     import { computed, onMounted, onUnmounted, ref } from 'vue';
+    /** Server line snapshot; odds are integer hundredths in P1/draw/P2 order. */
     type Match = { id: number; name: string; odds: number[] };
+    /** Frozen price chosen by the player, independent of subsequent live updates. */
     type Selection = { match: number; outcome: number; odds: number };
+    /** Payload preserved unchanged until the server gives a definitive result. */
     type BetRequest = Selection & { key: string; amount: string };
     const matches = ref<Match[]>([]);
     const balance = ref<number>();
@@ -13,6 +16,7 @@
     const pending = ref<BetRequest>();
     const storageBlocked = ref(false);
     const pendingStorageKey = 'sportsbook.pending.v1';
+    // Recovery is best effort; saved JSON currently has no runtime schema check.
     try {
         const saved = localStorage.getItem(pendingStorageKey);
         if (saved) {
@@ -25,6 +29,7 @@
         message.value =
             'Хранилище недоступно. Отправка новых ставок заблокирована.';
     }
+    /** Remove durable state first; a storage failure keeps the retry in memory. */
     function clearPending() {
         localStorage.removeItem(pendingStorageKey);
         pending.value = undefined;
@@ -36,7 +41,9 @@
     );
     let events: EventSource | undefined;
     onUnmounted(() => events?.close());
+    /** Display minor units or odds hundredths; never use this for balance math. */
     const money = (n: number) => (n / 100).toFixed(2);
+    // Wallet loads once; EventSource reconnects automatically after transport errors.
     onMounted(async () => {
         try {
             const response = await fetch('/api/wallet');
@@ -52,6 +59,11 @@
         };
         events.onerror = () => (connected.value = false);
     });
+    /**
+     * Persist before sending and reuse the payload on uncertain results.
+     * Clear it only on validated success or a definitive application rejection.
+     * busy prevents overlapping submissions within this mounted component.
+     */
     async function submit() {
         if (busy.value || storageBlocked.value) return;
         if (!pending.value) {

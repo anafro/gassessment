@@ -1,3 +1,12 @@
+<#
+.SYNOPSIS
+Runs repository lint, tests, build and container configuration validation.
+.PARAMETER Fix
+Formats Go and Prettier-managed files before validation. Does not install tools.
+.NOTES
+Requires the pinned PSScriptAnalyzer module, installed npm dependencies and Docker.
+Postgres integration tests run only when TEST_DATABASE_URL is set.
+#>
 param([switch]$Fix)
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
@@ -7,6 +16,7 @@ if ($issues.Count -gt 0) {
     $issues | Format-Table
     throw 'PowerShell lint failed'
 }
+# Native program failures do not automatically obey ErrorActionPreference.
 function Assert-NativeSuccess {
     if ($LASTEXITCODE -ne 0) { throw "Check failed (exit $LASTEXITCODE)" }
 }

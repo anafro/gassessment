@@ -18,16 +18,20 @@ import (
     "gorm.io/gorm/clause"
 )
 
+// Match is a line snapshot with odds in integer hundredths, ordered P1/draw/P2.
 type Match struct {
     ID   int               `json:"id"`
     Name string            `json:"name"`
     Odds [outcomeCount]int `json:"odds"`
 }
 
+// lineMutex protects all reads and replacements of the process-local line.
 var lineMutex sync.RWMutex
 var line []Match
 var database *gorm.DB
 
+// generateLine averages normalized probabilities from independent simulated sources.
+// Applying overround and rounding odds down gives the bookmaker margin.
 func generateLine() []Match {
     result := make([]Match, len(matchNames))
     for i, n := range matchNames {
@@ -51,6 +55,9 @@ func generateLine() []Match {
     }
     return result
 }
+
+// respond writes a JSON value after selecting the status. Encoding failures can only
+// be logged: headers may already be sent, so another error response is unsafe.
 func respond(w http.ResponseWriter, status int, v any) {
     w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(status)
@@ -58,6 +65,8 @@ func respond(w http.ResponseWriter, status int, v any) {
         log.Printf("encode response: %v", err)
     }
 }
+
+// main initializes the demo schema and wallet, refreshes the line, and serves HTTP.
 func main() {
     var err error
     database, err = gorm.Open(postgres.Open(os.Getenv("DATABASE_URL")), &gorm.Config{})
@@ -72,6 +81,7 @@ func main() {
     if err := database.AutoMigrate(&Wallet{}, &Bet{}); err != nil {
         log.Fatal(err)
     }
+    // Never replenish an existing wallet when restarting the application.
     if err := database.Clauses(clause.OnConflict{DoNothing: true}).Create(&Wallet{ID: playerWalletID, Balance: initialBalanceMinor}).Error; err != nil {
         log.Fatal(err)
     }
@@ -88,6 +98,7 @@ func main() {
         defer lineMutex.RUnlock()
         respond(w, http.StatusOK, line)
     })
+    // Each SSE connection sends snapshots, including unchanged ones, until disconnect.
     http.HandleFunc("/api/events", func(w http.ResponseWriter, r *http.Request) {
         w.Header().Set("Content-Type", "text/event-stream")
         w.Header().Set("Cache-Control", "no-cache")
@@ -127,6 +138,9 @@ func main() {
     http.HandleFunc("/api/bets", placeBet)
     log.Fatal(http.ListenAndServe(listenAddress, nil))
 }
+
+// placeBet accepts one bounded JSON object and maps domain rejections to HTTP.
+// Infrastructure failures are uncertain to the client and require the same-key retry.
 func placeBet(w http.ResponseWriter, r *http.Request) {
     if r.Method != http.MethodPost {
         w.Header().Set("Allow", http.MethodPost)
