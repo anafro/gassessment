@@ -24,3 +24,5 @@ pwsh -File scripts/lint.ps1
 ```
 
 Run the full validation after every script or instruction change. The nginx check uses an isolated container with an api host mapping, so it does not require the running application.
+
+The full check must provision isolated disposable Postgres on a random localhost port, run uncached integration tests, restore TEST_DATABASE_URL and remove only its own container/volumes in finally. Database or Docker failures must fail validation, never skip money tests.
