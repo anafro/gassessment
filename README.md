@@ -25,3 +25,9 @@
 Install tooling: `npm install` in the repository root and in `frontend`. Run `pwsh -File scripts/lint.ps1` after every change. Use `-Fix` to format. Checks cover ESLint (TypeScript/Vue), Stylelint (CSS), Prettier (HTML/JSON/YAML/Markdown), Go formatting/vet/tests, TypeScript build, Compose validation, Hadolint (Dockerfiles), and nginx configuration validation. Docker must be running; nginx validation uses the nginx:alpine image. All indentation is four spaces; Go uses gofmt output with tabs expanded to four spaces.
 
 PowerShell lint setup (once): `Save-Module -Name PSScriptAnalyzer -RequiredVersion 1.24.0 -Path .cache/psmodules -Force`.
+
+Рефакторинг соглашений: ИИ привёл имена и импорты Go к единому стилю, добавил явную обработку ошибок JSON/SSE и поиска повторной ставки. Во Vue запрос повтора стал реактивным, соединение SSE закрывается при удалении компонента, имя выбранного матча вычисляется через computed. Проверки: полный scripts/lint.ps1.
+
+Хранилище переведено ИИ на GORM с Postgres-драйвером: модели Wallet/Bet, AutoMigrate, блокировка FOR UPDATE и прежние атомарные операции. Существующие имена таблиц сохранены; стартовый баланс создаётся только при отсутствии игрока.
+
+Безопасность денег: принятие ставки выделено в GORM Transaction callback с таймаутом, guarded UPDATE и проверкой RowsAffected. Ответ об успехе выдаётся после commit. JSON ограничен одним объектом. Незавершённый запрос сохраняется в localStorage до отправки и восстанавливается после перезагрузки. При недоступном хранилище новые запросы блокируются. Интеграционный TestMoneyPostgres проверяет повторы, конфликт ключа, конкурентные списания, недостаток средств и rollback при ошибке после вставки. Запуск: TEST_DATABASE_URL в формате Postgres key=value DSN для отдельной тестовой базы; тест использует собственную временную схему. Это по-прежнему демонстрация одного игрока без авторизации и без защиты от действий другого клиента с доступом к API.
