@@ -1,32 +1,51 @@
 <script setup lang="ts">
-    import { ref, onMounted } from 'vue';
+    import { computed, onMounted, onUnmounted, ref } from 'vue';
     type Match = { id: number; name: string; odds: number[] };
-    const matches = ref<Match[]>([]),
-        balance = ref<number>(),
-        connected = ref(false),
-        message = ref(''),
-        amount = ref('100.00'),
-        busy = ref(false);
-    const selected = ref<{ match: number; outcome: number; odds: number }>();
-    let pending:
-        | {
-              key: string;
-              match: number;
-              outcome: number;
-              odds: number;
-              amount: string;
-          }
-        | undefined;
+    type Selection = { match: number; outcome: number; odds: number };
+    type BetRequest = Selection & { key: string; amount: string };
+    const matches = ref<Match[]>([]);
+    const balance = ref<number>();
+    const connected = ref(false);
+    const message = ref('');
+    const amount = ref('100.00');
+    const busy = ref(false);
+    const selected = ref<Selection>();
+    const pending = ref<BetRequest>();
+    const storageBlocked = ref(false);
+    const pendingStorageKey = 'sportsbook.pending.v1';
+    try {
+        const saved = localStorage.getItem(pendingStorageKey);
+        if (saved) {
+            pending.value = JSON.parse(saved);
+            selected.value = pending.value;
+            message.value =
+                'Есть незавершённый запрос. Повторите его для проверки.';
+        }
+    } catch {
+        message.value =
+            'Хранилище недоступно. Отправка новых ставок заблокирована.';
+    }
+    function clearPending() {
+        localStorage.removeItem(pendingStorageKey);
+        pending.value = undefined;
+    }
+    const selectedMatchName = computed(
+        () =>
+            matches.value.find((match) => match.id === selected.value?.match)
+                ?.name,
+    );
+    let events: EventSource | undefined;
+    onUnmounted(() => events?.close());
     const money = (n: number) => (n / 100).toFixed(2);
     onMounted(async () => {
         try {
-            const r = await fetch('/api/wallet');
-            if (!r.ok) throw Error();
-            balance.value = (await r.json()).balance;
+            const response = await fetch('/api/wallet');
+            if (!response.ok) throw new Error();
+            balance.value = (await response.json()).balance;
         } catch {
             message.value = 'Не удалось загрузить баланс';
         }
-        const events = new EventSource('/api/events');
+        events = new EventSource('/api/events');
         events.onmessage = (e) => {
             matches.value = JSON.parse(e.data);
             connected.value = true;
@@ -34,8 +53,8 @@
         events.onerror = () => (connected.value = false);
     });
     async function submit() {
-        if (busy.value) return;
-        if (!pending) {
+        if (busy.value || storageBlocked.value) return;
+        if (!pending.value) {
             if (
                 !selected.value ||
                 !/^\d{1,7}(\.\d{1,2})?$/.test(amount.value)
@@ -49,32 +68,55 @@
                 message.value = 'Сумма должна быть положительной';
                 return;
             }
-            pending = {
+            pending.value = {
                 ...selected.value,
                 key: crypto.randomUUID(),
                 amount: String(cents),
             };
         }
+        try {
+            localStorage.setItem(
+                pendingStorageKey,
+                JSON.stringify(pending.value),
+            );
+        } catch {
+            message.value =
+                'Не удалось сохранить запрос. Ставка не отправлена.';
+            return;
+        }
         busy.value = true;
         try {
-            const r = await fetch('/api/bets', {
+            const response = await fetch('/api/bets', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(pending),
+                body: JSON.stringify(pending.value),
             });
-            const data = await r.json();
-            if (!r.ok) {
-                if (r.status < 500) pending = undefined;
-                throw Error(typeof data === 'string' ? data : 'Ошибка сервера');
+            const data = await response.json();
+            if (!response.ok) {
+                if (
+                    [400, 409, 422].includes(response.status) &&
+                    typeof data === 'string'
+                )
+                    clearPending();
+                throw new Error(
+                    typeof data === 'string' ? data : 'Ошибка сервера',
+                );
+            }
+            if (
+                data.accepted !== true ||
+                !Number.isSafeInteger(data.balance) ||
+                data.balance < 0
+            ) {
+                throw new Error('Некорректный ответ сервера');
             }
             balance.value = data.balance;
-            pending = undefined;
+            clearPending();
             selected.value = undefined;
             message.value = 'Ставка принята';
         } catch (e) {
             message.value =
                 (e instanceof Error ? e.message : 'Ошибка сети') +
-                (pending
+                (pending.value
                     ? ' Повторите: запрос сохранён, двойного списания не будет.'
                     : '');
         } finally {
@@ -107,6 +149,7 @@
                     <button
                         v-for="(odd, i) in m.odds"
                         :key="i"
+                        type="button"
                         :disabled="!connected || busy || !!pending"
                         :class="{
                             chosen:
@@ -125,7 +168,7 @@
         <aside>
             <h2>Купон</h2>
             <p v-if="selected">
-                {{ matches.find((m) => m.id === selected?.match)?.name }} ·
+                {{ selectedMatchName }} ·
                 {{ ['П1', 'Х', 'П2'][selected.outcome] }} @
                 {{ money(selected.odds) }}
             </p>
@@ -137,6 +180,7 @@
                     inputmode="decimal"
                     :disabled="busy || !!pending" /></label
             ><button
+                type="button"
                 :disabled="
                     busy ||
                     (!pending &&

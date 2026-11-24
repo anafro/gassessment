@@ -12,6 +12,7 @@ export default ts.config(
         languageOptions: {
             globals: {
                 fetch: 'readonly',
+                localStorage: 'readonly',
                 EventSource: 'readonly',
                 crypto: 'readonly',
             },
