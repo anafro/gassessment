@@ -28,7 +28,13 @@ func (e *betRejection) Error() string { return e.message }
 
 func acceptBet(ctx context.Context, db *gorm.DB, request BetRequest) (int64, error) {
     amount, err := strconv.ParseInt(request.Amount, 10, 64)
-    if err != nil || amount <= 0 || amount > maxBetAmountMinor || strconv.FormatInt(amount, 10) != request.Amount || len(request.Key) < minIdempotencyKeyLength || len(request.Key) > maxIdempotencyKeyLength || request.Match < 1 || request.Match > len(matchNames) || request.Outcome < 0 || request.Outcome >= outcomeCount || request.Odds <= oddsScale || request.Odds > maxAcceptedOdds {
+    validAmount := err == nil && Between(amount, 1, maxBetAmountMinor) &&
+        strconv.FormatInt(amount, 10) == request.Amount
+    validKey := Between(len(request.Key), minIdempotencyKeyLength, maxIdempotencyKeyLength)
+    validMatch := Between(request.Match, 1, len(matchNames))
+    validOutcome := Between(request.Outcome, 0, outcomeCount-1)
+    validOdds := Between(request.Odds, oddsScale+1, maxAcceptedOdds)
+    if !validAmount || !validKey || !validMatch || !validOutcome || !validOdds {
         return 0, &betRejection{http.StatusBadRequest, "Неверные параметры"}
     }
     ctx, cancel := context.WithTimeout(ctx, betTransactionTimeout)
