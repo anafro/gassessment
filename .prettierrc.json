@@ -1,0 +1,7 @@
+{
+    "tabWidth": 4,
+    "useTabs": false,
+    "singleQuote": true,
+    "vueIndentScriptAndStyle": true,
+    "overrides": [{ "files": "*.yaml", "options": { "tabWidth": 4 } }]
+}

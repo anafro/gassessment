@@ -1,0 +1,9 @@
+.cache
+.idea
+node_modules
+dist
+backend
+**/Dockerfile
+**/nginx.conf
+package-lock.json
+frontend/package-lock.json
