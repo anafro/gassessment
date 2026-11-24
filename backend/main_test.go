@@ -3,8 +3,8 @@ package main
 import "testing"
 
 func TestLine(t *testing.T) {
-    for n := 0; n < 100; n++ {
-        line := generate()
+    for range 100 {
+        line := generateLine()
         if len(line) != 6 {
             t.Fatal("match count")
         }
