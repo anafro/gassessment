@@ -19,9 +19,9 @@ import (
 )
 
 type Match struct {
-    ID   int    `json:"id"`
-    Name string `json:"name"`
-    Odds [3]int `json:"odds"`
+    ID   int               `json:"id"`
+    Name string            `json:"name"`
+    Odds [outcomeCount]int `json:"odds"`
 }
 
 var lineMutex sync.RWMutex
@@ -29,24 +29,23 @@ var line []Match
 var database *gorm.DB
 
 func generateLine() []Match {
-    names := []string{"Зенит — Спартак", "Динамо — Рубин", "Краснодар — ЦСКА", "Ростов — Локомотив", "Балтика — Ахмат", "Оренбург — Сочи"}
-    result := make([]Match, len(names))
-    for i, n := range names {
-        var p [3]float64
-        for range 2 {
-            var raw [3]float64
+    result := make([]Match, len(matchNames))
+    for i, n := range matchNames {
+        var p [outcomeCount]float64
+        for range oddsSourceCount {
+            var raw [outcomeCount]float64
             sum := 0.0
             for j := range raw {
-                raw[j] = 0.2 + rand.Float64()
+                raw[j] = minimumSourceWeight + rand.Float64()
                 sum += raw[j]
             }
             for j := range p {
-                p[j] += raw[j] / sum / 2
+                p[j] += raw[j] / sum / oddsSourceCount
             }
         }
         m := Match{ID: i + 1, Name: n}
         for j := range p {
-            m.Odds[j] = int(math.Floor(100 / (p[j] * 1.05)))
+            m.Odds[j] = int(math.Floor(oddsScale / (p[j] * lineOverround)))
         }
         result[i] = m
     }
@@ -73,12 +72,12 @@ func main() {
     if err := database.AutoMigrate(&Wallet{}, &Bet{}); err != nil {
         log.Fatal(err)
     }
-    if err := database.Clauses(clause.OnConflict{DoNothing: true}).Create(&Wallet{ID: 1, Balance: 100000}).Error; err != nil {
+    if err := database.Clauses(clause.OnConflict{DoNothing: true}).Create(&Wallet{ID: playerWalletID, Balance: initialBalanceMinor}).Error; err != nil {
         log.Fatal(err)
     }
     line = generateLine()
     go func() {
-        for range time.Tick(5 * time.Second) {
+        for range time.Tick(lineRefreshInterval) {
             lineMutex.Lock()
             line = generateLine()
             lineMutex.Unlock()
@@ -96,7 +95,7 @@ func main() {
         if !ok {
             return
         }
-        t := time.NewTicker(time.Second)
+        t := time.NewTicker(eventPublishInterval)
         defer t.Stop()
         for {
             select {
@@ -119,14 +118,14 @@ func main() {
     })
     http.HandleFunc("/api/wallet", func(w http.ResponseWriter, r *http.Request) {
         var wallet Wallet
-        if err := database.WithContext(r.Context()).First(&wallet, 1).Error; err != nil {
+        if err := database.WithContext(r.Context()).First(&wallet, playerWalletID).Error; err != nil {
             respond(w, http.StatusServiceUnavailable, "База недоступна")
             return
         }
         respond(w, http.StatusOK, map[string]int64{"balance": wallet.Balance})
     })
     http.HandleFunc("/api/bets", placeBet)
-    log.Fatal(http.ListenAndServe(":8080", nil))
+    log.Fatal(http.ListenAndServe(listenAddress, nil))
 }
 func placeBet(w http.ResponseWriter, r *http.Request) {
     if r.Method != http.MethodPost {
@@ -135,7 +134,7 @@ func placeBet(w http.ResponseWriter, r *http.Request) {
         return
     }
     var request BetRequest
-    decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
+    decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBetRequestBytes))
     decoder.DisallowUnknownFields()
     if err := decoder.Decode(&request); err != nil {
         respond(w, http.StatusBadRequest, "Неверный запрос")

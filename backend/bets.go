@@ -6,7 +6,6 @@ import (
     "fmt"
     "net/http"
     "strconv"
-    "time"
 
     "gorm.io/gorm"
     "gorm.io/gorm/clause"
@@ -29,15 +28,15 @@ func (e *betRejection) Error() string { return e.message }
 
 func acceptBet(ctx context.Context, db *gorm.DB, request BetRequest) (int64, error) {
     amount, err := strconv.ParseInt(request.Amount, 10, 64)
-    if err != nil || amount <= 0 || amount > 100000000 || strconv.FormatInt(amount, 10) != request.Amount || len(request.Key) < 16 || len(request.Key) > 100 || request.Match < 1 || request.Match > 6 || request.Outcome < 0 || request.Outcome > 2 || request.Odds <= 100 || request.Odds > 10000 {
+    if err != nil || amount <= 0 || amount > maxBetAmountMinor || strconv.FormatInt(amount, 10) != request.Amount || len(request.Key) < minIdempotencyKeyLength || len(request.Key) > maxIdempotencyKeyLength || request.Match < 1 || request.Match > len(matchNames) || request.Outcome < 0 || request.Outcome >= outcomeCount || request.Odds <= oddsScale || request.Odds > maxAcceptedOdds {
         return 0, &betRejection{http.StatusBadRequest, "Неверные параметры"}
     }
-    ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+    ctx, cancel := context.WithTimeout(ctx, betTransactionTimeout)
     defer cancel()
     var balance int64
     err = db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
         var wallet Wallet
-        if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&wallet, 1).Error; err != nil {
+        if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&wallet, playerWalletID).Error; err != nil {
             return err
         }
         var existing Bet
@@ -64,7 +63,7 @@ func acceptBet(ctx context.Context, db *gorm.DB, request BetRequest) (int64, err
         if err := tx.Create(&bet).Error; err != nil {
             return err
         }
-        result := tx.Model(&Wallet{}).Where("id = ? AND balance >= ?", 1, amount).UpdateColumn("balance", gorm.Expr("balance - ?", amount))
+        result := tx.Model(&Wallet{}).Where("id = ? AND balance >= ?", playerWalletID, amount).UpdateColumn("balance", gorm.Expr("balance - ?", amount))
         if result.Error != nil {
             return result.Error
         }
