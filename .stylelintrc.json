@@ -1,4 +1,7 @@
 {
     "extends": "stylelint-config-standard",
-    "customSyntax": "postcss-html"
+    "ignoreFiles": ["**/dist/**", "**/node_modules/**"],
+    "rules": {
+        "import-notation": "string"
+    }
 }

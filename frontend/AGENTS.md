@@ -32,3 +32,8 @@ The Vite command is a UI development server; it has no API proxy configured. Use
 
 - Persist the original pending request before sending. Recover it after reload; never generate a new key for an uncertain result.
 - Only clear a request after confirmed acceptance or a definitive application rejection. Treat transport errors, malformed replies and server failures as uncertain.
+
+## Tailwind CSS
+
+- Use Tailwind CSS v4 utilities in Vue templates and the official Vite plugin. Keep complete class names in source so the scanner can detect them; do not construct names dynamically.
+- Keep global base rules in style.css. Prefer utilities over component style blocks. Stylelint checks CSS files; the production build verifies Tailwind compilation.

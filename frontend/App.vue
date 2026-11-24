@@ -125,62 +125,75 @@
     }
 </script>
 <template>
-    <main>
-        <header>
-            <h1>Мини-спортсбук</h1>
-            <strong
+    <main class="mx-auto my-9 max-w-[950px] p-5">
+        <header class="flex flex-wrap items-center justify-between gap-4">
+            <h1 class="my-5 text-[28px] font-bold">Мини-спортсбук</h1>
+            <strong class="font-bold"
                 >Баланс:
                 {{
                     balance === undefined ? '—' : money(balance) + ' ₽'
                 }}</strong
             >
         </header>
-        <p :class="connected ? 'online' : 'offline'">
+        <p
+            class="my-4"
+            :class="connected ? 'text-[#187747]' : 'text-[#b74121]'"
+        >
             {{
                 connected
                     ? '● Линия обновляется'
                     : '● Связь потеряна, переподключаемся…'
             }}
         </p>
-        <section>
-            <article v-for="m in matches" :key="m.id">
-                <h3>{{ m.name }}</h3>
-                <div class="odds">
+        <section
+            class="grid grid-cols-[repeat(auto-fit,minmax(min(260px,100%),1fr))] gap-3.5"
+        >
+            <article
+                v-for="m in matches"
+                :key="m.id"
+                class="rounded-[10px] bg-white p-5"
+            >
+                <h3 class="mb-4 font-bold">{{ m.name }}</h3>
+                <div class="flex gap-2">
                     <button
                         v-for="(odd, i) in m.odds"
                         :key="i"
                         type="button"
+                        class="flex-1 cursor-pointer rounded-md border border-slate-300 p-3 disabled:cursor-default disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                         :disabled="!connected || busy || !!pending"
-                        :class="{
-                            chosen:
-                                selected?.match === m.id &&
-                                selected?.outcome === i,
-                        }"
+                        :class="
+                            selected?.match === m.id && selected?.outcome === i
+                                ? 'bg-[#215bd7] text-white'
+                                : 'bg-[#e8eef7] text-[#192637]'
+                        "
                         @click="
                             selected = { match: m.id, outcome: i, odds: odd }
                         "
                     >
-                        {{ ['П1', 'Х', 'П2'][i] }} <b>{{ money(odd) }}</b>
+                        {{ ['П1', 'Х', 'П2'][i] }}
+                        <b class="ml-2.5 font-bold">{{ money(odd) }}</b>
                     </button>
                 </div>
             </article>
         </section>
-        <aside>
-            <h2>Купон</h2>
-            <p v-if="selected">
+        <aside class="mt-5 rounded-[10px] bg-white p-5">
+            <h2 class="my-5 text-2xl font-bold">Купон</h2>
+            <p v-if="selected" class="my-4">
                 {{ selectedMatchName }} ·
                 {{ ['П1', 'Х', 'П2'][selected.outcome] }} @
                 {{ money(selected.odds) }}
             </p>
-            <p v-else>Выберите исход</p>
+            <p v-else class="my-4">Выберите исход</p>
             <label
                 >Сумма, ₽
                 <input
                     v-model="amount"
                     inputmode="decimal"
+                    class="mx-3 w-30 rounded-md border border-slate-300 p-3"
                     :disabled="busy || !!pending" /></label
             ><button
                 type="button"
+                class="cursor-pointer rounded-md border border-slate-300 bg-[#215bd7] p-3 text-white disabled:cursor-default disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                 :disabled="
                     busy ||
                     (!pending &&
@@ -196,98 +209,7 @@
                           : 'Поставить'
                 }}
             </button>
-            <p role="status">{{ message }}</p>
+            <p role="status" class="my-4">{{ message }}</p>
         </aside>
     </main>
 </template>
-<style>
-    body {
-        margin: 0;
-        background: #f3f5f8;
-        color: #192637;
-        font: 16px system-ui;
-    }
-
-    main {
-        max-width: 950px;
-        margin: 35px auto;
-        padding: 20px;
-    }
-
-    header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-    h1 {
-        font-size: 28px;
-    }
-
-    section {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 14px;
-    }
-
-    article,
-    aside {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-    }
-
-    h3 {
-        margin-top: 0;
-    }
-
-    .odds {
-        display: flex;
-        gap: 8px;
-    }
-
-    button {
-        cursor: pointer;
-        background: #e8eef7;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        padding: 12px;
-        flex: 1;
-        color: #192637;
-    }
-
-    button.chosen,
-    aside button {
-        background: #215bd7;
-        color: white;
-    }
-
-    button:disabled {
-        opacity: 0.5;
-        cursor: default;
-    }
-
-    b {
-        margin-left: 10px;
-    }
-
-    aside {
-        margin-top: 20px;
-    }
-
-    input {
-        padding: 12px;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        margin: 0 12px;
-        width: 120px;
-    }
-
-    .online {
-        color: #187747;
-    }
-
-    .offline {
-        color: #b74121;
-    }
-</style>
