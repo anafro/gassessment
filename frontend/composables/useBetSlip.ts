@@ -1,3 +1,4 @@
+import { ru } from '../locales/ru';
 import { get, set } from '@vueuse/core';
 import { computed, ref, type Ref } from 'vue';
 import {
@@ -27,13 +28,10 @@ export function useBetSlip({ matches, balance, connected }: BetSlipOptions) {
     const pending = ref<BetRequest | undefined>(recovery.pending);
     const storageBlocked = ref(recovery.blocked);
     if (recovery.blocked) {
-        set(
-            message,
-            'Не удалось восстановить запрос. Новые ставки заблокированы: проверьте хранилище браузера.',
-        );
+        set(message, ru.messages.recoveryBlocked);
     } else if (recovery.pending) {
         set(selected, recovery.pending);
-        set(message, 'Есть незавершённый запрос. Повторите его для проверки.');
+        set(message, ru.messages.pendingRecovered);
     }
     /** Remove durable state first; a storage failure keeps the retry in memory. */
     function clearPending() {
@@ -75,13 +73,13 @@ export function useBetSlip({ matches, balance, connected }: BetSlipOptions) {
         if (!get(pending)) {
             const selection = get(selected);
             if (!selection || !/^\d{1,7}(\.\d{1,2})?$/.test(get(amount))) {
-                set(message, 'Введите сумму с точностью до копеек');
+                set(message, ru.messages.invalidAmount);
                 return;
             }
             const [rub, kop = ''] = get(amount).split('.');
             const cents = Number(rub) * 100 + Number(kop.padEnd(2, '0'));
             if (cents <= 0) {
-                set(message, 'Сумма должна быть положительной');
+                set(message, ru.messages.positiveAmount);
                 return;
             }
             set(pending, {
@@ -96,7 +94,7 @@ export function useBetSlip({ matches, balance, connected }: BetSlipOptions) {
                 JSON.stringify(get(pending)),
             );
         } catch {
-            set(message, 'Не удалось сохранить запрос. Ставка не отправлена.');
+            set(message, ru.messages.persistenceFailed);
             return;
         }
         set(busy, true);
@@ -114,7 +112,7 @@ export function useBetSlip({ matches, balance, connected }: BetSlipOptions) {
                 )
                     clearPending();
                 throw new Error(
-                    typeof data === 'string' ? data : 'Ошибка сервера',
+                    typeof data === 'string' ? data : ru.messages.serverError,
                 );
             }
             if (
@@ -122,19 +120,17 @@ export function useBetSlip({ matches, balance, connected }: BetSlipOptions) {
                 !Number.isSafeInteger(data.balance) ||
                 data.balance < 0
             ) {
-                throw new Error('Некорректный ответ сервера');
+                throw new Error(ru.messages.invalidResponse);
             }
             set(balance, data.balance);
             clearPending();
             set(selected, undefined);
-            set(message, 'Ставка принята');
+            set(message, ru.messages.accepted);
         } catch (e) {
             set(
                 message,
-                (e instanceof Error ? e.message : 'Ошибка сети') +
-                    (get(pending)
-                        ? ' Повторите: запрос сохранён, двойного списания не будет.'
-                        : ''),
+                (e instanceof Error ? e.message : ru.messages.networkError) +
+                    (get(pending) ? ru.messages.retryHint : ''),
             );
         } finally {
             set(busy, false);

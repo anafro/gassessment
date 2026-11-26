@@ -1,4 +1,5 @@
 <script setup lang="ts">
+    import { ru } from '../locales/ru';
     import { money } from '../lib/format';
     import type { Match, Selection } from '../types';
     defineProps<{
@@ -11,11 +12,7 @@
 </script>
 <template>
     <p class="my-4" :class="connected ? 'text-[#187747]' : 'text-[#b74121]'">
-        {{
-            connected
-                ? '● Линия обновляется'
-                : '● Связь потеряна, переподключаемся…'
-        }}
+        {{ connected ? ru.line.connected : ru.line.disconnected }}
     </p>
     <section
         class="grid grid-cols-[repeat(auto-fit,minmax(min(260px,100%),1fr))] gap-3.5"
@@ -42,7 +39,7 @@
                         emit('select', { match: m.id, outcome: i, odds: odd })
                     "
                 >
-                    {{ ['П1', 'Х', 'П2'][i] }}
+                    {{ ru.outcomes[i] }}
                     <b class="ml-2.5 font-bold">{{ money(odd) }}</b>
                 </button>
             </div>

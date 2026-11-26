@@ -1,4 +1,5 @@
 <script setup lang="ts">
+    import { ru } from '../locales/ru';
     import { money } from '../lib/format';
     import type { Selection } from '../types';
     defineProps<{
@@ -15,15 +16,14 @@
 </script>
 <template>
     <aside class="mt-5 rounded-[10px] bg-white p-5">
-        <h2 class="my-5 text-2xl font-bold">Купон</h2>
+        <h2 class="my-5 text-2xl font-bold">{{ ru.slip.title }}</h2>
         <p v-if="selected" class="my-4">
-            {{ selectedMatchName }} ·
-            {{ ['П1', 'Х', 'П2'][selected.outcome] }} @
+            {{ selectedMatchName }} · {{ ru.outcomes[selected.outcome] }} @
             {{ money(selected.odds) }}
         </p>
-        <p v-else class="my-4">Выберите исход</p>
+        <p v-else class="my-4">{{ ru.slip.selectOutcome }}</p>
         <label
-            >Сумма, ₽
+            >{{ ru.slip.amount }}
             <input
                 v-model="amount"
                 inputmode="decimal"
@@ -36,7 +36,11 @@
             @click="emit('submit')"
         >
             {{
-                busy ? 'Отправка…' : pending ? 'Повторить запрос' : 'Поставить'
+                busy
+                    ? ru.slip.sending
+                    : pending
+                      ? ru.slip.retry
+                      : ru.slip.submit
             }}
         </button>
         <p role="status" class="my-4">{{ message }}</p>

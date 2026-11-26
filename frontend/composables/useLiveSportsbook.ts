@@ -1,3 +1,4 @@
+import { ru } from '../locales/ru';
 import { set } from '@vueuse/core';
 import { onMounted, onUnmounted, ref } from 'vue';
 import type { Match } from '../types';
@@ -17,7 +18,7 @@ export function useLiveSportsbook() {
             if (!response.ok) throw new Error();
             set(balance, (await response.json()).balance);
         } catch {
-            set(loadError, 'Не удалось загрузить баланс');
+            set(loadError, ru.messages.balanceLoadFailed);
         }
         events = new EventSource('/api/events');
         events.onmessage = (e) => {
