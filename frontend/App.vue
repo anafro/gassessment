@@ -6,19 +6,13 @@
         pendingStorageKey,
         type BetRequest,
     } from './recovery';
-    import { money } from './lib/format';
-    /** Server line snapshot; odds are integer hundredths in P1/draw/P2 order. */
-    type Match = {
-        id: number;
-        name: string;
-        odds: number[];
-    };
-    /** Frozen price chosen by the player, independent of subsequent live updates. */
-    type Selection = {
-        match: number;
-        outcome: number;
-        odds: number;
-    };
+    import SportsbookHeader from './components/SportsbookHeader.vue';
+    import MatchLine from './components/MatchLine.vue';
+    import BetSlip from './components/BetSlip.vue';
+    import type { Match, Selection } from './types';
+    function selectOutcome(selection: Selection) {
+        set(selected, selection);
+    }
     const matches = ref<Match[]>([]);
     const balance = ref<number>();
     const connected = ref(false);
@@ -148,93 +142,28 @@
 </script>
 <template>
     <main class="mx-auto my-9 max-w-[950px] p-5">
-        <header class="flex flex-wrap items-center justify-between gap-4">
-            <h1 class="my-5 text-[28px] font-bold">Мини-спортсбук</h1>
-            <strong class="font-bold"
-                >Баланс:
-                {{
-                    balance === undefined ? '—' : money(balance) + ' ₽'
-                }}</strong
-            >
-        </header>
-        <p
-            class="my-4"
-            :class="connected ? 'text-[#187747]' : 'text-[#b74121]'"
-        >
-            {{
-                connected
-                    ? '● Линия обновляется'
-                    : '● Связь потеряна, переподключаемся…'
-            }}
-        </p>
-        <section
-            class="grid grid-cols-[repeat(auto-fit,minmax(min(260px,100%),1fr))] gap-3.5"
-        >
-            <article
-                v-for="m in matches"
-                :key="m.id"
-                class="rounded-[10px] bg-white p-5"
-            >
-                <h3 class="mb-4 font-bold">{{ m.name }}</h3>
-                <div class="flex gap-2">
-                    <button
-                        v-for="(odd, i) in m.odds"
-                        :key="i"
-                        type="button"
-                        class="flex-1 cursor-pointer rounded-md border border-slate-300 p-3 disabled:cursor-default disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                        :disabled="
-                            storageBlocked || !connected || busy || !!pending
-                        "
-                        :class="
-                            selected?.match === m.id && selected?.outcome === i
-                                ? 'bg-[#215bd7] text-white'
-                                : 'bg-[#e8eef7] text-[#192637]'
-                        "
-                        @click="
-                            selected = { match: m.id, outcome: i, odds: odd }
-                        "
-                    >
-                        {{ ['П1', 'Х', 'П2'][i] }}
-                        <b class="ml-2.5 font-bold">{{ money(odd) }}</b>
-                    </button>
-                </div>
-            </article>
-        </section>
-        <aside class="mt-5 rounded-[10px] bg-white p-5">
-            <h2 class="my-5 text-2xl font-bold">Купон</h2>
-            <p v-if="selected" class="my-4">
-                {{ selectedMatchName }} ·
-                {{ ['П1', 'Х', 'П2'][selected.outcome] }} @
-                {{ money(selected.odds) }}
-            </p>
-            <p v-else class="my-4">Выберите исход</p>
-            <label
-                >Сумма, ₽
-                <input
-                    v-model="amount"
-                    inputmode="decimal"
-                    class="mx-3 w-30 rounded-md border border-slate-300 p-3"
-                    :disabled="storageBlocked || busy || !!pending" /></label
-            ><button
-                type="button"
-                class="cursor-pointer rounded-md border border-slate-300 bg-[#215bd7] p-3 text-white disabled:cursor-default disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                :disabled="
-                    storageBlocked ||
-                    busy ||
-                    (!pending &&
-                        (!selected || !connected || balance === undefined))
-                "
-                @click="submit"
-            >
-                {{
-                    busy
-                        ? 'Отправка…'
-                        : pending
-                          ? 'Повторить запрос'
-                          : 'Поставить'
-                }}
-            </button>
-            <p role="status" class="my-4">{{ message }}</p>
-        </aside>
+        <SportsbookHeader :balance="balance" />
+        <MatchLine
+            :matches="matches"
+            :connected="connected"
+            :selected="selected"
+            :disabled="storageBlocked || !connected || busy || !!pending"
+            @select="selectOutcome"
+        />
+        <BetSlip
+            v-model:amount="amount"
+            :selected="selected"
+            :selected-match-name="selectedMatchName"
+            :edit-disabled="storageBlocked || busy || !!pending"
+            :submit-disabled="
+                storageBlocked ||
+                busy ||
+                (!pending && (!selected || !connected || balance === undefined))
+            "
+            :busy="busy"
+            :pending="!!pending"
+            :message="message"
+            @submit="submit"
+        />
     </main>
 </template>
