@@ -1,15 +1,24 @@
 <script setup lang="ts">
+    import { get, set } from '@vueuse/core';
     import { computed, onMounted, onUnmounted, ref } from 'vue';
     import {
         recoverPending,
         pendingStorageKey,
         type BetRequest,
     } from './recovery';
-    import {money} from "./lib/format";
+    import { money } from './lib/format';
     /** Server line snapshot; odds are integer hundredths in P1/draw/P2 order. */
-    type Match = { id: number; name: string; odds: number[] };
+    type Match = {
+        id: number;
+        name: string;
+        odds: number[];
+    };
     /** Frozen price chosen by the player, independent of subsequent live updates. */
-    type Selection = { match: number; outcome: number; odds: number };
+    type Selection = {
+        match: number;
+        outcome: number;
+        odds: number;
+    };
     const matches = ref<Match[]>([]);
     const balance = ref<number>();
     const connected = ref(false);
@@ -25,41 +34,41 @@
     const pending = ref<BetRequest | undefined>(recovery.pending);
     const storageBlocked = ref(recovery.blocked);
     if (recovery.blocked) {
-        message.value =
-            'Не удалось восстановить запрос. Новые ставки заблокированы: проверьте хранилище браузера.';
+        set(
+            message,
+            'Не удалось восстановить запрос. Новые ставки заблокированы: проверьте хранилище браузера.',
+        );
     } else if (recovery.pending) {
-        selected.value = recovery.pending;
-        message.value =
-            'Есть незавершённый запрос. Повторите его для проверки.';
+        set(selected, recovery.pending);
+        set(message, 'Есть незавершённый запрос. Повторите его для проверки.');
     }
     /** Remove durable state first; a storage failure keeps the retry in memory. */
     function clearPending() {
         localStorage.removeItem(pendingStorageKey);
-        pending.value = undefined;
+        set(pending, undefined);
     }
     const selectedMatchName = computed(
         () =>
-            matches.value.find((match) => match.id === selected.value?.match)
+            get(matches).find((match) => match.id === get(selected)?.match)
                 ?.name,
     );
     let events: EventSource | undefined;
     onUnmounted(() => events?.close());
-
     // Wallet loads once; EventSource reconnects automatically after transport errors.
     onMounted(async () => {
         try {
             const response = await fetch('/api/wallet');
             if (!response.ok) throw new Error();
-            balance.value = (await response.json()).balance;
+            set(balance, (await response.json()).balance);
         } catch {
-            message.value = 'Не удалось загрузить баланс';
+            set(message, 'Не удалось загрузить баланс');
         }
         events = new EventSource('/api/events');
         events.onmessage = (e) => {
-            matches.value = JSON.parse(e.data);
-            connected.value = true;
+            set(matches, JSON.parse(e.data));
+            set(connected, true);
         };
-        events.onerror = () => (connected.value = false);
+        events.onerror = () => set(connected, false);
     });
     /**
      * Persist before sending and reuse the payload on uncertain results.
@@ -67,43 +76,40 @@
      * busy prevents overlapping submissions within this mounted component.
      */
     async function submit() {
-        if (busy.value || storageBlocked.value) return;
-        if (!pending.value) {
-            if (
-                !selected.value ||
-                !/^\d{1,7}(\.\d{1,2})?$/.test(amount.value)
-            ) {
-                message.value = 'Введите сумму с точностью до копеек';
+        if (get(busy) || get(storageBlocked)) return;
+        if (!get(pending)) {
+            const selection = get(selected);
+            if (!selection || !/^\d{1,7}(\.\d{1,2})?$/.test(get(amount))) {
+                set(message, 'Введите сумму с точностью до копеек');
                 return;
             }
-            const [rub, kop = ''] = amount.value.split('.');
+            const [rub, kop = ''] = get(amount).split('.');
             const cents = Number(rub) * 100 + Number(kop.padEnd(2, '0'));
             if (cents <= 0) {
-                message.value = 'Сумма должна быть положительной';
+                set(message, 'Сумма должна быть положительной');
                 return;
             }
-            pending.value = {
-                ...selected.value,
+            set(pending, {
+                ...selection,
                 key: crypto.randomUUID(),
                 amount: String(cents),
-            };
+            });
         }
         try {
             localStorage.setItem(
                 pendingStorageKey,
-                JSON.stringify(pending.value),
+                JSON.stringify(get(pending)),
             );
         } catch {
-            message.value =
-                'Не удалось сохранить запрос. Ставка не отправлена.';
+            set(message, 'Не удалось сохранить запрос. Ставка не отправлена.');
             return;
         }
-        busy.value = true;
+        set(busy, true);
         try {
             const response = await fetch('/api/bets', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(pending.value),
+                body: JSON.stringify(get(pending)),
             });
             const data = await response.json();
             if (!response.ok) {
@@ -123,18 +129,20 @@
             ) {
                 throw new Error('Некорректный ответ сервера');
             }
-            balance.value = data.balance;
+            set(balance, data.balance);
             clearPending();
-            selected.value = undefined;
-            message.value = 'Ставка принята';
+            set(selected, undefined);
+            set(message, 'Ставка принята');
         } catch (e) {
-            message.value =
+            set(
+                message,
                 (e instanceof Error ? e.message : 'Ошибка сети') +
-                (pending.value
-                    ? ' Повторите: запрос сохранён, двойного списания не будет.'
-                    : '');
+                    (get(pending)
+                        ? ' Повторите: запрос сохранён, двойного списания не будет.'
+                        : ''),
+            );
         } finally {
-            busy.value = false;
+            set(busy, false);
         }
     }
 </script>
