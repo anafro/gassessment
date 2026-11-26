@@ -5,6 +5,7 @@
         pendingStorageKey,
         type BetRequest,
     } from './recovery';
+    import {money} from "./lib/format";
     /** Server line snapshot; odds are integer hundredths in P1/draw/P2 order. */
     type Match = { id: number; name: string; odds: number[] };
     /** Frozen price chosen by the player, independent of subsequent live updates. */
@@ -43,8 +44,7 @@
     );
     let events: EventSource | undefined;
     onUnmounted(() => events?.close());
-    /** Display minor units or odds hundredths; never use this for balance math. */
-    const money = (n: number) => (n / 100).toFixed(2);
+
     // Wallet loads once; EventSource reconnects automatically after transport errors.
     onMounted(async () => {
         try {
