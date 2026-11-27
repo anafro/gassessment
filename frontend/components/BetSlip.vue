@@ -5,6 +5,8 @@
     defineProps<{
         selected?: Selection;
         selectedMatchName?: string;
+        offeredOdds?: number;
+        confirmationDisabled: boolean;
         editDisabled: boolean;
         submitDisabled: boolean;
         busy: boolean;
@@ -12,7 +14,10 @@
         message: string;
     }>();
     const amount = defineModel<string>('amount', { required: true });
-    const emit = defineEmits<{ submit: [] }>();
+    const emit = defineEmits<{
+        submit: [];
+        confirmOdds: [displayedOdds: number];
+    }>();
 </script>
 <template>
     <aside class="mt-5 rounded-[10px] bg-white p-5">
@@ -22,6 +27,21 @@
             {{ money(selected.odds) }}
         </p>
         <p v-else class="my-4">{{ ru.slip.selectOutcome }}</p>
+        <div
+            v-if="offeredOdds !== undefined"
+            class="my-4 rounded-md border border-amber-400 bg-amber-50 p-3"
+            role="status"
+        >
+            <p>{{ ru.slip.priceChanged }} {{ money(offeredOdds) }}</p>
+            <button
+                type="button"
+                class="mt-2 cursor-pointer rounded-md bg-blue-700 p-3 text-white disabled:opacity-50"
+                :disabled="confirmationDisabled"
+                @click="emit('confirmOdds', offeredOdds)"
+            >
+                {{ ru.slip.confirmPrice }} {{ money(offeredOdds) }}
+            </button>
+        </div>
         <label
             >{{ ru.slip.amount }}
             <input

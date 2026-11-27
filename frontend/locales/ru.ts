@@ -11,6 +11,8 @@ export const ru = {
     },
     slip: {
         title: 'Купон',
+        priceChanged: 'Коэффициент изменился. Новая цена:',
+        confirmPrice: 'Подтвердить коэффициент',
         selectOutcome: 'Выберите исход',
         amount: 'Сумма, ₽',
         sending: 'Отправка…',

@@ -12,6 +12,8 @@
         amount,
         selected,
         selectedMatchName,
+        offeredOdds,
+        confirmOdds,
         pending,
         busy,
         message,
@@ -37,11 +39,14 @@
             v-model:amount="amount"
             :selected="selected"
             :selected-match-name="selectedMatchName"
+            :offered-odds="offeredOdds"
+            :confirmation-disabled="editDisabled || !connected"
             :edit-disabled="editDisabled"
             :submit-disabled="submitDisabled"
             :busy="busy"
             :pending="!!pending"
             :message="statusMessage"
+            @confirm-odds="confirmOdds"
             @submit="submit"
         />
     </main>

@@ -44,6 +44,25 @@ export function useBetSlip({ matches, balance, connected }: BetSlipOptions) {
                 ?.name,
     );
 
+    // Keep the accepted selection frozen until the player confirms a displayed price.
+    const offeredOdds = computed(() => {
+        const selection = get(selected);
+        if (!selection || get(pending)) return undefined;
+        const odds = get(matches).find((match) => match.id === selection.match)
+            ?.odds[selection.outcome];
+        return odds !== undefined && odds !== selection.odds ? odds : undefined;
+    });
+    function confirmOdds(displayedOdds: number) {
+        if (
+            get(editDisabled) ||
+            !get(connected) ||
+            get(offeredOdds) !== displayedOdds
+        )
+            return;
+        const selection = get(selected);
+        if (selection) set(selected, { ...selection, odds: displayedOdds });
+    }
+
     function selectOutcome(selection: Selection) {
         if (get(selectionDisabled)) return;
         set(selected, selection);
@@ -58,6 +77,7 @@ export function useBetSlip({ matches, balance, connected }: BetSlipOptions) {
         () =>
             get(storageBlocked) ||
             get(busy) ||
+            get(offeredOdds) !== undefined ||
             (!get(pending) &&
                 (!get(selected) ||
                     !get(connected) ||
@@ -69,7 +89,7 @@ export function useBetSlip({ matches, balance, connected }: BetSlipOptions) {
      * busy prevents overlapping submissions within this mounted component.
      */
     async function submit() {
-        if (get(busy) || get(storageBlocked)) return;
+        if (get(submitDisabled)) return;
         if (!get(pending)) {
             const selection = get(selected);
             if (!selection || !/^\d{1,7}(\.\d{1,2})?$/.test(get(amount))) {
@@ -141,6 +161,8 @@ export function useBetSlip({ matches, balance, connected }: BetSlipOptions) {
         amount,
         selected,
         selectedMatchName,
+        offeredOdds,
+        confirmOdds,
         pending,
         busy,
         message,
